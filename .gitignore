@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+output/
+demo_event/
+warp_compare.png
+web/node_modules/
+web/demo/
+web/js_embeddings.json
+web/.vercel/
+*.npz

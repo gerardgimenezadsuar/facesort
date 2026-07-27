@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceSort — sort event photos by person, privately</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #18181b;
+    --muted: #71717a;
+    --line: #e4e4e7;
+    --accent: #4f6ef7;
+    --accent-soft: #4f6ef714;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101012;
+      --card: #18181b;
+      --text: #f4f4f5;
+      --muted: #8e8e96;
+      --line: #27272a;
+      --accent: #7288ff;
+      --accent-soft: #7288ff1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .nav {
+    max-width: 1080px; margin: 0 auto; padding: 22px 24px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .wordmark { font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+  .wordmark::before { content: "◉ "; color: var(--accent); }
+  .pill {
+    font-size: 12.5px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px;
+  }
+  .pill b { color: var(--text); font-weight: 550; }
+
+  /* ---- landing / dropzone ---- */
+  #dropzone {
+    margin-top: 9vh; text-align: center;
+    border: 1.5px dashed var(--line); border-radius: 20px;
+    padding: 72px 32px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone:hover, #dropzone.drag { border-color: var(--accent); background: var(--accent-soft); }
+  #dropzone h1 { font-size: 26px; letter-spacing: -.02em; margin: 18px 0 6px; }
+  #dropzone p { color: var(--muted); margin: 0 0 26px; }
+  #dropzone .faces { display: flex; justify-content: center; gap: -6px; }
+  #dropzone .faces span {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent-soft); border: 1.5px solid var(--accent);
+    display: inline-grid; place-items: center; font-size: 22px;
+    margin: 0 -7px;
+  }
+  .btn {
+    display: inline-block; border: none; cursor: pointer; font: inherit;
+    padding: 10px 22px; border-radius: 10px;
+    background: var(--accent); color: #fff; font-weight: 550;
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--line); font-weight: 500;
+  }
+  .btn.ghost:hover { filter: none; background: var(--accent-soft); border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: wait; filter: none; }
+  .btn.small { padding: 6px 14px; font-size: 13.5px; border-radius: 8px; }
+  #dropzone .hint { font-size: 12.5px; color: var(--muted); margin-top: 22px; }
+
+  /* ---- progress ---- */
+  #progress { margin-top: 12vh; text-align: center; }
+  #barwrap {
+    height: 4px; width: min(420px, 80%); margin: 0 auto 18px;
+    background: var(--line); border-radius: 2px; overflow: hidden;
+  }
+  #bar { height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width .25s; }
+  #status { color: var(--muted); font-size: 14px; }
+
+  /* ---- toolbar ---- */
+  #toolbar {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 14px 18px; margin: 8px 0 22px;
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  #stats { font-weight: 600; letter-spacing: -.01em; }
+  #stats small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .slider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; margin-left: auto; }
+  input[type=range] { accent-color: var(--accent); width: 130px; }
+  input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  /* ---- pile cards ---- */
+  .person, .occasional {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px; margin: 14px 0;
+    box-shadow: 0 1px 2px #0000000a;
+  }
+  .pile-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+  .name {
+    font: inherit; font-size: 16px; font-weight: 650; letter-spacing: -.01em;
+    color: var(--text); background: none; border: none;
+    border-bottom: 1px dashed transparent; padding: 2px 1px; width: 12ch;
+  }
+  .name:hover { border-bottom-color: var(--line); }
+  .name:focus { outline: none; border-bottom-color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13.5px; }
+  .spacer { flex: 1; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .grid img {
+    width: 76px; height: 76px; border-radius: 9px; object-fit: cover;
+    transition: transform .12s;
+  }
+  .grid img:hover { transform: scale(1.06); }
+  .grid.dim img { width: 56px; height: 56px; opacity: .5; }
+  .more { align-self: center; color: var(--muted); font-size: 13px; padding: 0 8px; }
+
+  .occasional summary {
+    cursor: pointer; color: var(--muted); font-size: 14px; font-weight: 550;
+    list-style: none;
+  }
+  .occasional summary::after { content: " ›"; }
+  .occasional[open] summary { margin-bottom: 14px; }
+  .occasional[open] summary::after { content: " ⌄"; }
+
+  footer {
+    max-width: 1080px; margin: 0 auto; padding: 28px 24px 40px;
+    color: var(--muted); font-size: 12.5px; text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="nav">
+  <span class="wordmark">FaceSort</span>
+  <span class="pill"><b>100% private</b> · photos never leave this device</span>
+</div>
+<main>
+  <section id="dropzone">
+    <div class="faces"><span>🙂</span><span>😄</span><span>🥂</span><span>😊</span></div>
+    <h1>Sort your event photos by person</h1>
+    <p>Drop a folder — get a pile per guest, ready to share.</p>
+    <span class="btn">Choose photo folder</span>
+    <input type="file" id="picker" webkitdirectory multiple hidden>
+    <div class="hint">Everything runs in your browser. After the page loads, zero bytes are uploaded — check the network tab.</div>
+  </section>
+
+  <section id="progress" hidden>
+    <div id="barwrap"><div id="bar"></div></div>
+    <p id="status">Loading…</p>
+  </section>
+
+  <section id="toolbar" hidden>
+    <span id="stats"></span>
+    <button class="btn ghost small" id="mergeBtn" title="Tick two or more piles, then merge them into one person">Merge selected</button>
+    <button class="btn small" id="downloadAllBtn">Download all</button>
+    <label class="slider">Grouping
+      <input type="range" id="threshold" min="0.4" max="0.9" step="0.01" value="0.70">
+      <span id="thval">0.70</span>
+    </label>
+  </section>
+
+  <div id="results"></div>
+</main>
+<footer>FaceSort processes faces on-device with open models. No accounts, no servers, no analytics.</footer>
+<script src="lib/ort.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

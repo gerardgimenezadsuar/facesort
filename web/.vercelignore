@@ -1,0 +1,7 @@
+node_modules
+demo
+test_node.mjs
+js_embeddings.json
+package.json
+package-lock.json
+lib/ort.min.js.map

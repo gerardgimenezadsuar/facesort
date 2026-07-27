@@ -293,10 +293,24 @@ $("downloadAllBtn").addEventListener("click", () => {
   downloadZip(state.people, "photos_by_person.zip", true);
 });
 
-const IMG_RE = /\.(jpe?g|png|webp|bmp)$/i;
+const IMG_RE = /\.(jpe?g|png|webp|bmp|heic|heif|avif)$/i;
+
+// phones have no folder concept: switch the picker to multi-select
+// from the photo library (iPads report a Mac UA, hence the touch check)
+const isMobile =
+  /Android|iPhone|iPod/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.userAgent));
+if (isMobile) {
+  $("picker").removeAttribute("webkitdirectory");
+  $("picker").setAttribute("accept", "image/*");
+  document.querySelector("#dropzone .btn").textContent = "Choose photos";
+  document.querySelector("#dropzone p").textContent =
+    "Select the event photos — get a pile per guest, ready to share.";
+}
+
 $("dropzone").addEventListener("click", () => $("picker").click());
 $("picker").addEventListener("change", (e) => {
-  const files = [...e.target.files].filter((f) => IMG_RE.test(f.name));
+  const files = [...e.target.files].filter((f) => IMG_RE.test(f.name) || f.type.startsWith("image/"));
   if (!files.length) return;
   runPipeline(files.map((f) => ({ name: f.webkitRelativePath || f.name, get: async () => f })));
 });
